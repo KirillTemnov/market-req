@@ -3,7 +3,7 @@
  "version": "0.1.0", 
  "description": "Market for oauth tokens for crowd calling, based on redis",
  "keywords": ["redis", "oauth"],
- "author": "Temonov Kirill <allselead@gmail.com>",
+ "author": "Temnov Kirill <allselead@gmail.com>",
  "dependencies": {
       "redis": "0.6.x",
       "coffee-script": ">=1.0.1"
