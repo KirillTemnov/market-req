@@ -6,6 +6,7 @@ sys = require "sys"
 
 mkt.version.should.match(/^\d+\.\d+\.\d+$/)
 
+
 client = mkt.createClient()
 client.client.flushdb ->
 

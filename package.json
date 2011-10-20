@@ -9,6 +9,7 @@
       "coffee-script": ">=1.0.1"
   }, 
  "devDependencies": {"should": ">=0.2.1"},
+ "scripts": { "test": "coffee test/index.coffee" },
  "main": "index", 
  "engines": { "node": ">=0.4.x" }
 }
