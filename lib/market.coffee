@@ -4,7 +4,9 @@ Market for crowd requests
 
 redis = require "redis"
 
-exports.version = "0.1.1"
+exports.version = "0.1.3"
+sys = require "sys"
+
 
 ###
 Class for connect to market and manage tokens
@@ -17,9 +19,10 @@ class MarketClient
   Add new token pair, hour is optional, default - current hour
   ###
   addToken:  (service, token, token_secret, requests, hour=null) ->
+    # todo split tokens requests to small chunks
     hour ||= parseInt Date.now() /(60 * 60000)
-    @client.zadd "mkt:#{service}:#{hour}", requests, "#{token} #{token_secret}"
     @client.hincrby "mkt:stat:#{service}:#{hour}", "total", requests
+    @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
 
   ###
   Get statistics by service and hour
@@ -29,7 +32,6 @@ class MarketClient
       total                    total token pairs x requests added
       used                     tokens fetched from market
       overflow                 number of overflow requests to market
-      tokens_over              number of requests, that could not be proceed (tokens missed for this hour
       fetch_requests           number of fetching requests
   ###
   getStatByHour: (service, hour, fn) ->
@@ -40,10 +42,36 @@ class MarketClient
         dict.fetch_requests ||= 0
         dict.used ||= 0
         dict.overflow ||= 0
-        dict.tokens_over ||= 0
         fn null, dict
       else
         fn {msg: "error getting stat"}
+
+  _popNext: (found, requests, result, key, statKey, fn) ->
+    @client.lpop key, (err, value) =>
+      if err
+        return fn {msg: "error getting value"}
+      else if !value            # reach end of list
+        @client.hincrby statKey, "overflow", 1
+        result.map (e) => @client.rpush key, JSON.stringify e
+        return fn {msg: "not enough tokens"}
+      else
+        value = JSON.parse value
+        if found + value.count <= requests
+          found += value.count
+          result.push value
+        else
+          newCount = requests - found
+          rest = value.count - newCount
+          value.count = newCount
+          result.push value
+          found = requests
+          @client.rpush key, JSON.stringify {count: rest, tok: value.tok, tok_secret: value.tok_secret}
+
+      if requests == found
+        @client.hincrby statKey, "used", requests
+        fn null, result
+      else
+        @_popNext found, requests, result, key, statKey, fn
 
   ###
   Utilize tokens from redis
@@ -57,40 +85,7 @@ class MarketClient
     statKey = "mkt:stat:#{service}:#{hour}"
     @client.hincrby statKey, "fetch_requests", 1
 
-    @client.hget statKey, "total", (err, total) =>
-      @client.hget statKey, "used", (err, used) =>
-        if parseInt(used) >= parseInt(total) - 1
-          @client.hincrby statKey, "overflow", 1
-          fn {msg: "not enough tokens"}
-        else
-          @client.zrevrange key, 0, 100, "withscores", (err, data) =>
-            if 0 == data.length
-              @client.hincrby statKey, "tokens_over", 1
-              return fn {msg: "tokens not found"}
-            result = []
-            found = 0
-            while found < requests && 0 < data.length
-              tokens = data.shift()
-              reqValue = parseInt(data.shift()) || 0
-              break if 0 == reqValue        # we not reach requested quantity, drop this!
-              if found + reqValue < requests
-                @client.zincrby key, -reqValue, tokens
-                found += reqValue
-              else
-                delta = reqValue - (requests - found)
-                @client.zadd key, delta, tokens
-                reqValue -= delta
-                found = requests
-              result.push [tokens.split(" "), reqValue]
-            if requests == found
-              @client.hincrby statKey, "used", requests
-              fn null, result
-            else
-              @client.hincrby statKey, "overflow", 1
-              for r in result
-                @client.zadd(key, r[1],  r[0].join " ") if r[1] > 0
-
-              fn {msg: "not enough tokens"}
+    @_popNext 0, requests, [], key, statKey, fn
 
 
 exports.createClient = (client) -> new MarketClient
