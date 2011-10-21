@@ -20,9 +20,8 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
    client.fetchTokens "srv", 3, (err, tokens) ->
      if !err
        # utilize tokens array
-       token_pair = tokens[0][0]
-       token = token_pair[0]
-       token_secret = token_pair[1]
+       token = tokens[0].tok
+       token_secret = tokens[0].tok_secret
 ```
 
 ## License 
