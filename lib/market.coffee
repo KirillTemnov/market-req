@@ -18,11 +18,17 @@ class MarketClient
   ###
   Add new token pair, hour is optional, default - current hour
   ###
-  addToken:  (service, token, token_secret, requests, hour=null) ->
-    # todo split tokens requests to small chunks
-    hour ||= parseInt Date.now() /(60 * 60000)
+  addToken:  (service, token, token_secret, requests, opts={}) ->
+    splitBy = opts.splitBy || 10
+    hour = opts.hour || parseInt Date.now() /(60 * 60000)
     @client.hincrby "mkt:stat:#{service}:#{hour}", "total", requests
-    @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
+    while requests > 0
+      if requests > splitBy
+        requests -= splitBy
+        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: splitBy}
+      else
+        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
+        requests = 0
 
   ###
   Get statistics by service and hour
