@@ -4,8 +4,8 @@ Market for crowd requests
 
 redis = require "redis"
 
-exports.version = "0.1.3"
-sys = require "sys"
+exports.version = "0.1.4"
+sys = require "util"
 
 
 ###
