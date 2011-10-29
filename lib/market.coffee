@@ -4,7 +4,7 @@ Market for crowd requests
 
 redis = require "redis"
 
-exports.version = "0.1.4"
+exports.version = "0.1.5"
 sys = require "util"
 
 
@@ -31,6 +31,19 @@ class MarketClient
         requests = 0
 
   ###
+  Return unused tokens to market, unlike `addToken`, this method *decrement* =used= counter and
+  increase =returned= counter, but not affect to =total= counter.
+  ###
+  returnToken: (service, token, token_secret, requests, opts={}) ->
+    if requests > 0
+      hour = opts.hour || parseInt Date.now() /(60 * 60000)
+      statKey = "mkt:stat:#{service}:#{hour}"
+      @client.hincrby statKey, "used", -requests
+      @client.hincrby statKey, "returned", requests
+      @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
+
+
+  ###
   Get statistics by service and hour
 
   fn callback assept error as first parameter and stat object as second
@@ -44,10 +57,11 @@ class MarketClient
     hour ||= parseInt Date.now() /(60 * 60000)
     @client.hgetall "mkt:stat:#{service}:#{hour}", (err, dict) ->
       if !err
-        dict.total ||= 0
-        dict.fetch_requests ||= 0
-        dict.used ||= 0
-        dict.overflow ||= 0
+        dict.total = parseInt(dict.total || 0)
+        dict.fetch_requests = parseInt(dict.fetch_requests || 0)
+        dict.used = parseInt(dict.used || 0)
+        dict.overflow = parseInt(dict.overflow || 0)
+        dict.returned = parseInt(dict.returned || 0)
         fn null, dict
       else
         fn {msg: "error getting stat"}

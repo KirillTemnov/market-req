@@ -2,7 +2,7 @@
 mkt = require "../"
 should = require "should"
 db = require("redis").createClient()
-sys = require "sys"
+sys = require "util"
 
 mkt.version.should.match(/^\d+\.\d+\.\d+$/)
 
@@ -48,6 +48,7 @@ client.client.flushdb ->
             data.total.should.eql 80
             data.used.should.eql 65
             data.overflow.should.eql 2
+            data.returned.should.eql 0
 
             console.log "All test passes, no errors found."
             process.exit()
