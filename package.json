@@ -1,6 +1,6 @@
 {
  "name": "market-req",
- "version": "0.1.5",
+ "version": "0.2.0",
  "description": "Market for oauth tokens for crowd calling, based on redis",
  "keywords": ["redis", "oauth"],
  "author": "Temnov Kirill <allselead@gmail.com>",
@@ -11,7 +11,7 @@
  "devDependencies": {"should": ">=0.2.1"},
  "scripts": { "test": "coffee test/index.coffee" },
  "main": "index",
- "engines": { "node": "0.4 || 0.5" },
+ "engines": { "node": ">= 0.4  <= 0.7" },
  "repository": {"type": "git", "url": "https://github.com/selead/market-req"},
  "licenses": {"type": "MIT"}
 }

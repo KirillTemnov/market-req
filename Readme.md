@@ -9,7 +9,7 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
 
       $ npm install market-req
 
-## Example (coffee-script)
+## Simple example (coffee-script)
 
 ```coffee-script
    client = require("market-req").createClient()
@@ -18,11 +18,44 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
    ...
    # fetch 3 tokens
    client.fetchTokens "srv", 3, (err, tokens) ->
-     if !err
+     unless err
        # utilize tokens array
        token = tokens[0].tok
        token_secret = tokens[0].tok_secret
 ```
+
+## Get market statistics
+
+```coffee-script
+    client = require("market-req").createClient()
+    # current hour
+    client.getStatByHour "srv", (err, stat) -> 
+      console.log "stat = #{JSON.stringify stat}"
+    ...
+    # custom hour
+    client.getStatByHour "srv", 367910, (err, stat) ->
+      console.log "stat = #{JSON.stringify stat}"
+```
+
+
+## Auto add tokens
+   Add tokens, that will be added authomatically each hour.
+   
+```coffee-script
+    client = require("market-req").createClient()
+    client.addAuto "srv", [["key1", "secret1", 15], ["key2", "secret2", 15]]
+    ...
+    client = require("market-req").createClient()
+    client.fetchTokens "srv", 20, (err, tokens) ->
+      console.log "err  = #{JSON.stringify err}\ntokens = #{JSON.stringify tokens}"
+```
+
+
+## Changelog
+
+### v 0.2.0
+    
+    Ability to automatically add specified tokens
 
 ## License 
 
