@@ -112,6 +112,7 @@ class MarketClient
             dict.returned           = parseInt(dict.returned || 0)
             dict.auto_tokens_total  = auto_tokens_total
             dict.auto_tokens_keys   = tokens.length
+            dict.hour               = hour
             fn null, dict
           else
             fn {msg: "error getting stat"}
