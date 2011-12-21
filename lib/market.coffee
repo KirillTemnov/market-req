@@ -2,18 +2,57 @@
 Market for crowd requests
 ###
 
-redis = require "redis"
+redis            = require "redis"
 
-exports.version = "0.1.5"
-sys = require "util"
+exports.version  = "0.2.0"
+sys              = require "util"
 
 
 ###
 Class for connect to market and manage tokens
 ###
 class MarketClient
+
   constructor: (client) ->
     @client = client || redis.createClient()
+
+
+  ###
+  Add auto tokens.
+
+  @param {String} service Service name
+  @param {Array} tokens Array of tokens. Each token is array from token, secret and
+                        count (in that order).
+  ###
+  addAuto: (service, tokens) ->
+    for t in tokens
+      @client.rpush "mkt:auto:#{service}", JSON.stringify t
+    @client.setnx "mkt:auto:#{service}:lasthour", 1
+
+  ###
+  Reset all auto tokens
+  ###
+  resetAuto:  (service) ->
+    @client.del "mkt:auto:#{service}"
+    @client.del "mkt:auto:#{service}:lasthour"
+
+  ###
+  Auto add tokens if needed
+  ###
+  _addAuto: (service, hour, fn) ->
+    @client.get "mkt:auto:#{service}:lasthour", (err, lasthour) =>
+      unless err
+        if lasthour isnt null and lasthour isnt "#{hour}"
+          @client.lrange "mkt:auto:#{service}", 0, -1, (err, tokens) =>
+            for t in tokens
+              tok = JSON.parse t
+              @addToken service, tok[0], tok[1], tok[2], hour: hour
+            @client.set "mkt:auto:#{service}:lasthour", hour
+            fn()
+        else
+          fn()
+      else
+        fn()
 
   ###
   Add new token pair, hour is optional, default - current hour
@@ -54,15 +93,28 @@ class MarketClient
       fetch_requests           number of fetching requests
   ###
   getStatByHour: (service, hour, fn) ->
-    hour ||= parseInt Date.now() /(60 * 60000)
-    @client.hgetall "mkt:stat:#{service}:#{hour}", (err, dict) ->
-      if !err
-        dict.total = parseInt(dict.total || 0)
-        dict.fetch_requests = parseInt(dict.fetch_requests || 0)
-        dict.used = parseInt(dict.used || 0)
-        dict.overflow = parseInt(dict.overflow || 0)
-        dict.returned = parseInt(dict.returned || 0)
-        fn null, dict
+    if "function" is typeof hour
+      fn = hour
+      hour = parseInt Date.now() /(60 * 60000)
+
+    @client.lrange "mkt:auto:#{service}", 0, -1, (err, tokens) =>
+      unless err
+        @client.hgetall "mkt:stat:#{service}:#{hour}", (err, dict) ->
+          unless err
+            auto_tokens_total       = 0
+            tokens.map (tok) ->
+              t = JSON.parse tok
+              auto_tokens_total += t[2]
+            dict.total              = parseInt(dict.total || 0)
+            dict.fetch_requests     = parseInt(dict.fetch_requests || 0)
+            dict.used               = parseInt(dict.used || 0)
+            dict.overflow           = parseInt(dict.overflow || 0)
+            dict.returned           = parseInt(dict.returned || 0)
+            dict.auto_tokens_total  = auto_tokens_total
+            dict.auto_tokens_keys   = tokens.length
+            fn null, dict
+          else
+            fn {msg: "error getting stat"}
       else
         fn {msg: "error getting stat"}
 
@@ -103,9 +155,9 @@ class MarketClient
     hour ||= parseInt Date.now() /(60 * 60000)
     key = "mkt:#{service}:#{hour}"
     statKey = "mkt:stat:#{service}:#{hour}"
-    @client.hincrby statKey, "fetch_requests", 1
-
-    @_popNext 0, requests, [], key, statKey, fn
+    @_addAuto service, hour, =>
+      @client.hincrby statKey, "fetch_requests", 1
+      @_popNext 0, requests, [], key, statKey, fn
 
 
 exports.createClient = (client) -> new MarketClient
