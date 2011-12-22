@@ -1,7 +1,7 @@
 {
  "name": "market-req",
- "version": "0.2.0",
- "description": "Market for oauth tokens for crowd calling, based on redis",
+ "version": "0.2.4",
+ "description": "Market for oauth tokens, based on redis. via @selead",
  "keywords": ["redis", "oauth"],
  "author": "Temnov Kirill <allselead@gmail.com>",
  "dependencies": {

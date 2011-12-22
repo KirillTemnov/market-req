@@ -43,19 +43,25 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
    
 ```coffee-script
     client = require("market-req").createClient()
-    client.addAuto "srv", [["key1", "secret1", 15], ["key2", "secret2", 15]]
+    client.addAuto "srv", [{key:"key1", secret:"secret1", count:10}, {key:"key2", secret:"secret2", count:20}]
     ...
-    client = require("market-req").createClient()
-    client.fetchTokens "srv", 20, (err, tokens) ->
+    # remove first key and add tokens to second
+    client.addAuto "srv", [{key:"key1", secret:"secret1", count:0}, {key:"key2", secret:"secret2", count:40}]
+    client.fetchTokens "srv", 22, (err, tokens) -> 
       console.log "err  = #{JSON.stringify err}\ntokens = #{JSON.stringify tokens}"
 ```
 
-
 ## Changelog
+
+### v 0.2.2
+    
+- Disable duplicate key tokens in auto tokens
+- Add method for replacing token counts addAuto (bulk) and replaceAutoToken (single update)
+
 
 ### v 0.2.0
     
-    Ability to automatically add specified tokens
+- Ability to automatically add specified tokens
 
 ## License 
 
