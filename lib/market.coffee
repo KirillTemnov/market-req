@@ -4,7 +4,7 @@ Market for crowd requests
 
 redis            = require "redis"
 
-exports.version  = "0.2.0"
+exports.version  = "0.2.4"
 sys              = require "util"
 
 
@@ -21,33 +21,77 @@ class MarketClient
   Add auto tokens.
 
   @param {String} service Service name
-  @param {Array} tokens Array of tokens. Each token is array from token, secret and
-                        count (in that order).
+  @param {Array} tokens Array of auto tokens.
+                 Each tokens is a dictionary.
+                  `token.id`     : unique id (by default `token.key` will be used)
+                  `token.key`    : key string
+                  `token.secret` : secret string
+                  `token.count`  : quantity of tokens
   ###
   addAuto: (service, tokens) ->
     for t in tokens
-      @client.rpush "mkt:auto:#{service}", JSON.stringify t
+      @client.hset "mkt:auto:#{service}", t.id || t.key, JSON.stringify t
     @client.setnx "mkt:auto:#{service}:lasthour", 1
 
   ###
-  Reset all auto tokens
+  Get auto tokens. This method useful for stat and debug.
+
+  @param {String} service Service name
+  @param {Function} fn Callback function, accept 1) err, 2) object contains
+                       `total` (Number) and `tokens` (Array) fields.
+  ###
+  getAllAutoTokens: (service, fn) ->
+    @client.hgetall "mkt:auto:#{service}", (err, keys) =>
+      unless err
+        total  = 0
+        tokens   = []
+        for key, ks of keys
+          k = JSON.parse ks
+          if k.count > 0
+            total += k.count
+            tokens.push k
+        fn null, total: total, tokens: tokens
+      else
+        fn err
+
+  ###
+  Replace one of auto tokens of add another one.
+
+  @param {String} service Service name
+  @param {Object} token New token dictionary.
+                  `token.id`     : unique id (by default `token.key` will be used)
+                  `token.key`    : key string
+                  `token.secret` : secret string
+                  `token.count`  : quantity of tokens
+
+  ###
+  replaceAutoToken: (service, token) ->
+    @client.hset "mkt:auto:#{service}", token.id || token.key, JSON.stringify token
+
+  ###
+  Reset all auto tokens.
+
+  @param {String} service Service name
   ###
   resetAuto:  (service) ->
     @client.del "mkt:auto:#{service}"
     @client.del "mkt:auto:#{service}:lasthour"
 
   ###
-  Auto add tokens if needed
+  Auto add tokens if needed. Called before fetching tokens and add auto tokens
+  if `hour` do not have special tokens.
   ###
   _addAuto: (service, hour, fn) ->
     @client.get "mkt:auto:#{service}:lasthour", (err, lasthour) =>
       unless err
-        if lasthour isnt null and lasthour isnt "#{hour}"
-          @client.lrange "mkt:auto:#{service}", 0, -1, (err, tokens) =>
-            for t in tokens
-              tok = JSON.parse t
-              @addToken service, tok[0], tok[1], tok[2], hour: hour
-            @client.set "mkt:auto:#{service}:lasthour", hour
+        if parseInt(lasthour) isnt parseInt(hour)
+          @client.hgetall "mkt:auto:#{service}", (err, keys) =>
+            unless err
+              for key, ks of keys
+                k = JSON.parse ks
+                if k.count > 0
+                  @addToken service, k.key, k.secret, k.count, hour: hour
+              @client.set "mkt:auto:#{service}:lasthour", hour
             fn()
         else
           fn()
@@ -97,27 +141,24 @@ class MarketClient
       fn = hour
       hour = parseInt Date.now() /(60 * 60000)
 
-    @client.lrange "mkt:auto:#{service}", 0, -1, (err, tokens) =>
+    @client.hgetall "mkt:stat:#{service}:#{hour}", (err, dict) =>
       unless err
-        @client.hgetall "mkt:stat:#{service}:#{hour}", (err, dict) ->
+        @getAllAutoTokens service, (err, tokObj) =>
           unless err
-            auto_tokens_total       = 0
-            tokens.map (tok) ->
-              t = JSON.parse tok
-              auto_tokens_total += t[2]
             dict.total              = parseInt(dict.total || 0)
             dict.fetch_requests     = parseInt(dict.fetch_requests || 0)
             dict.used               = parseInt(dict.used || 0)
             dict.overflow           = parseInt(dict.overflow || 0)
             dict.returned           = parseInt(dict.returned || 0)
-            dict.auto_tokens_total  = auto_tokens_total
-            dict.auto_tokens_keys   = tokens.length
+            dict.auto_tokens_total  = tokObj.total
+            dict.auto_tokens_keys   = tokObj.tokens.length
             dict.hour               = hour
             fn null, dict
           else
-            fn {msg: "error getting stat"}
+            fn {msg: "error getting stat: auto-tokens"}
       else
-        fn {msg: "error getting stat"}
+        fn {msg: "error getting stat: hour"}
+
 
   _popNext: (found, requests, result, key, statKey, fn) ->
     @client.lpop key, (err, value) =>
@@ -151,11 +192,11 @@ class MarketClient
   ###
   fetchTokens: (service, requests, hour, fn) ->
     if "function" == typeof hour
-      fn = hour
-      hour = null
-    hour ||= parseInt Date.now() /(60 * 60000)
-    key = "mkt:#{service}:#{hour}"
-    statKey = "mkt:stat:#{service}:#{hour}"
+      fn    = hour
+      hour  = null
+    hour   ||= parseInt Date.now() /(60 * 60000)
+    key      = "mkt:#{service}:#{hour}"
+    statKey  = "mkt:stat:#{service}:#{hour}"
     @_addAuto service, hour, =>
       @client.hincrby statKey, "fetch_requests", 1
       @_popNext 0, requests, [], key, statKey, fn
