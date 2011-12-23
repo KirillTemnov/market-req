@@ -21,8 +21,8 @@ client.client.flushdb ->
     client.fetchTokens "any-srv", 10, 365365, (err, data) ->
       should.equal null, err
       data.length.should.eql 1
-      data[0].tok.should.eql "a"
-      data[0].tok_secret.should.eql "a_secret"
+      data[0].key.should.eql "a"
+      data[0].secret.should.eql "a_secret"
       data[0].count.should.eql 10
 
       client.fetchTokens "any-srv", 200, 365365, (err, data) ->
@@ -31,14 +31,14 @@ client.client.flushdb ->
         client.fetchTokens "any-srv", 55, 365365, (err, data) ->
           should.equal null, err
           data.length.should.eql 3
-          data[0].tok.should.eql "b"
-          data[0].tok_secret.should.eql "b_secret"
+          data[0].key.should.eql "b"
+          data[0].secret.should.eql "b_secret"
           data[0].count.should.eql 20
-          data[1].tok.should.eql "k"
-          data[1].tok_secret.should.eql "k_secret"
+          data[1].key.should.eql "k"
+          data[1].secret.should.eql "k_secret"
           data[1].count.should.eql 20
-          data[2].tok.should.eql "k"
-          data[2].tok_secret.should.eql "k_secret"
+          data[2].key.should.eql "k"
+          data[2].secret.should.eql "k_secret"
           data[2].count.should.eql 15
 
 

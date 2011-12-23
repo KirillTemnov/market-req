@@ -3,8 +3,7 @@ Market for crowd requests
 ###
 
 redis            = require "redis"
-
-exports.version  = "0.2.4"
+exports.version  = "0.2.6"
 sys              = require "util"
 
 
@@ -108,22 +107,26 @@ class MarketClient
     while requests > 0
       if requests > splitBy
         requests -= splitBy
-        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: splitBy}
+        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {key: token, secret: token_secret, count: splitBy}
       else
-        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
+        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {key: token, secret: token_secret, count: requests}
         requests = 0
 
   ###
   Return unused tokens to market, unlike `addToken`, this method *decrement* =used= counter and
   increase =returned= counter, but not affect to =total= counter.
   ###
-  returnToken: (service, token, token_secret, requests, opts={}) ->
-    if requests > 0
-      hour = opts.hour || parseInt Date.now() /(60 * 60000)
-      statKey = "mkt:stat:#{service}:#{hour}"
-      @client.hincrby statKey, "used", -requests
-      @client.hincrby statKey, "returned", requests
-      @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {tok: token, tok_secret: token_secret, count: requests}
+  returnTokens: (service, tokens, hour, fn) ->
+    if "function" is typeof fn
+      fn    = hour
+      hour  = null
+    hour   |= parseInt Date.now() / (60 * 60000)
+    statKey = "mkt:stat:#{service}:#{hour}"
+    for t in tokens
+      if t.count > 0
+        @client.hincrby statKey, "used", -t.count
+        @client.hincrby statKey, "returned", t.count
+        @client.rpush "mkt:#{service}:#{hour}", JSON.stringify {key: t.key, secret: t.secret, count: requests}
 
 
   ###
@@ -159,7 +162,6 @@ class MarketClient
       else
         fn {msg: "error getting stat: hour"}
 
-
   _popNext: (found, requests, result, key, statKey, fn) ->
     @client.lpop key, (err, value) =>
       if err
@@ -172,14 +174,13 @@ class MarketClient
         value = JSON.parse value
         if found + value.count <= requests
           found += value.count
-          result.push value
         else
-          newCount = requests - found
-          rest = value.count - newCount
-          value.count = newCount
-          result.push value
-          found = requests
-          @client.rpush key, JSON.stringify {count: rest, tok: value.tok, tok_secret: value.tok_secret}
+          newCount     = requests - found
+          rest         = value.count - newCount
+          value.count  = newCount
+          found        = requests
+          @client.rpush key, JSON.stringify {count: rest, key: value.key, secret: value.secret}
+        result.push value
 
       if requests == found
         @client.hincrby statKey, "used", requests

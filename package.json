@@ -1,7 +1,7 @@
 {
  "name": "market-req",
- "version": "0.2.4",
- "description": "Market for oauth tokens, based on redis. via @selead",
+ "version": "0.2.6",
+ "description": "Market for oauth tokens, based on redis.",
  "keywords": ["redis", "oauth"],
  "author": "Temnov Kirill <allselead@gmail.com>",
  "dependencies": {

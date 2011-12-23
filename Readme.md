@@ -20,8 +20,8 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
    client.fetchTokens "srv", 3, (err, tokens) ->
      unless err
        # utilize tokens array
-       token = tokens[0].tok
-       token_secret = tokens[0].tok_secret
+       token         = tokens[0].key
+       token_secret  = tokens[0].secret
 ```
 
 ## Get market statistics
@@ -43,7 +43,7 @@ to overcome rpm/rph limit by using more than one token. Store tokens and usage s
    
 ```coffee-script
     client = require("market-req").createClient()
-    client.addAuto "srv", [{key:"key1", secret:"secret1", count:10}, {key:"key2", secret:"secret2", count:20}]
+    client.addAuto "srv", [{key:"key1", secret:"secret1", count:10}, {key:"key2", secret:"secret2", count:20}]2
     ...
     # remove first key and add tokens to second
     client.addAuto "srv", [{key:"key1", secret:"secret1", count:0}, {key:"key2", secret:"secret2", count:40}]
